@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GoM3U Studio — Advanced M3U Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0" rel="stylesheet">
+<style>
+/* ============================================================
+   GoM3U Studio — Design tokens
+   Palette: void #0a0e14, panel rgba(17,22,30,.62), ink #e7ecf5,
+   muted #8792a6, violet #6f5cff, cyan #22d3ee, amber #f5a623,
+   danger #ef4b5f, ok #2fd77a
+   Display: Space Grotesk / Body: Inter / Data: JetBrains Mono
+   Signature: the "signal bars" live meter in the header + the
+   glass channel table with a scanning gradient row-hover.
+============================================================ */
+:root{
+  --void:#0a0e14; --panel:rgba(19,24,33,.62); --panel-solid:#131923;
+  --line:rgba(255,255,255,.08); --ink:#e7ecf5; --muted:#8792a6;
+  --violet:#6f5cff; --cyan:#22d3ee; --amber:#f5a623; --danger:#ef4b5f; --ok:#2fd77a;
+  --grad: linear-gradient(120deg,var(--violet),var(--cyan));
+  --radius:14px; --radius-sm:9px;
+  --font-display:'Space Grotesk',sans-serif; --font-body:'Inter',sans-serif; --font-mono:'JetBrains Mono',monospace;
+  --fs-base:14px;
+  --shadow: 0 8px 30px rgba(0,0,0,.35);
+}
+html[data-theme="light"]{
+  --void:#eef1f7; --panel:rgba(255,255,255,.7); --panel-solid:#ffffff;
+  --line:rgba(10,14,20,.09); --ink:#151a23; --muted:#5b6473;
+  --shadow: 0 8px 24px rgba(20,30,50,.10);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  font-family:var(--font-body); font-size:var(--fs-base); color:var(--ink);
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(111,92,255,.18), transparent 60%),
+    radial-gradient(1000px 500px at -10% 110%, rgba(34,211,238,.14), transparent 60%),
+    var(--void);
+  min-height:100vh; overflow:hidden;
+}
+::selection{background:rgba(111,92,255,.35);}
+::-webkit-scrollbar{width:10px; height:10px;}
+::-webkit-scrollbar-thumb{background:rgba(135,146,166,.35); border-radius:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+button{font-family:inherit; cursor:pointer;}
+input,select,textarea{font-family:inherit; color:var(--ink); background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:var(--radius-sm); padding:8px 10px; font-size:13px;}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--cyan); outline-offset:1px;}
+a{color:inherit;}
+.msr{font-family:'Material Symbols Rounded'; font-weight:500; font-size:20px; line-height:1; vertical-align:middle;}
+.hidden{display:none !important;}
+.glass{ background:var(--panel); backdrop-filter:blur(18px) saturate(140%); -webkit-backdrop-filter:blur(18px) saturate(140%); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+
+/* ---------- Login ---------- */
+#loginScreen{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:500; }
+.login-card{ width:360px; padding:34px 30px; text-align:center; animation:riseIn .5s ease; }
+.login-logo{ display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:6px; font-family:var(--font-display); font-weight:700; font-size:22px;}
+.login-logo .bars{display:flex; gap:3px; align-items:flex-end; height:20px;}
+.login-logo .bars span{width:4px; background:var(--grad); border-radius:2px; animation:bar 1.1s ease-in-out infinite;}
+.login-logo .bars span:nth-child(1){height:8px; animation-delay:0s;}
+.login-logo .bars span:nth-child(2){height:18px; animation-delay:.15s;}
+.login-logo .bars span:nth-child(3){height:12px; animation-delay:.3s;}
+.login-logo .bars span:nth-child(4){height:20px; animation-delay:.45s;}
+@keyframes bar{0%,100%{transform:scaleY(.4);}50%{transform:scaleY(1);}}
+.login-sub{color:var(--muted); font-size:12.5px; margin-bottom:24px;}
+.field{ text-align:left; margin-bottom:14px; }
+.field label{ display:block; font-size:12px; color:var(--muted); margin-bottom:5px;}
+.field input{ width:100%; }
+.check-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted); margin:10px 0 18px; }
+.btn{ border:none; border-radius:var(--radius-sm); padding:10px 16px; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:6px; transition:transform .15s ease, box-shadow .15s ease, background .15s ease; color:var(--ink); background:rgba(255,255,255,.06); border:1px solid var(--line);}
+.btn:hover{ transform:translateY(-1px); }
+.btn:active{ transform:translateY(0); }
+.btn-primary{ background:var(--grad); color:#0a0e14; border:none; box-shadow:0 6px 18px rgba(111,92,255,.35);}
+.btn-primary .msr{color:#0a0e14;}
+.btn-danger{ background:rgba(239,75,95,.14); color:var(--danger); border:1px solid rgba(239,75,95,.35);}
+.btn-ghost{ background:transparent; }
+.btn-block{ width:100%; justify-content:center; }
+.login-err{ color:var(--danger); font-size:12px; min-height:16px; margin-bottom:6px;}
+@keyframes riseIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+
+/* ---------- App shell ---------- */
+#app{ display:none; height:100vh; grid-template-rows:56px 1fr 30px; grid-template-columns:220px 1fr; }
+#app.show{ display:grid; }
+.topbar{ grid-column:1/3; display:flex; align-items:center; gap:14px; padding:0 16px; border-bottom:1px solid var(--line); background:var(--panel-solid); z-index:20;}
+.brand{ display:flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:700; font-size:16px; white-space:nowrap;}
+.brand .bars{display:flex; gap:2px; align-items:flex-end; height:14px;}
+.brand .bars span{width:3px; background:var(--grad); border-radius:1px; animation:bar 1.1s ease-in-out infinite;}
+.brand .bars span:nth-child(1){height:6px;} .brand .bars span:nth-child(2){height:13px; animation-delay:.15s;} .brand .bars span:nth-child(3){height:9px; animation-delay:.3s;}
+.searchbox{ flex:1; max-width:420px; display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:999px; padding:6px 12px;}
+.searchbox input{ border:none; background:transparent; flex:1; padding:2px; }
+.searchbox .msr{ color:var(--muted); font-size:18px;}
+.top-actions{ display:flex; align-items:center; gap:8px; margin-left:auto;}
+.icon-btn{ width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:9px; background:transparent; border:1px solid transparent; color:var(--muted);}
+.icon-btn:hover{ background:rgba(255,255,255,.06); color:var(--ink); border-color:var(--line);}
+.online-dot{ width:8px; height:8px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok); }
+.online-dot.off{ background:var(--danger); box-shadow:0 0 8px var(--danger); }
+
+.sidebar{ border-right:1px solid var(--line); background:var(--panel-solid); overflow-y:auto; padding:10px; z-index:15;}
+.nav-item{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius-sm); color:var(--muted); font-size:13px; font-weight:500; cursor:pointer; margin-bottom:2px; transition:background .15s, color .15s;}
+.nav-item:hover{ background:rgba(255,255,255,.05); color:var(--ink); }
+.nav-item.active{ background:linear-gradient(90deg, rgba(111,92,255,.22), rgba(34,211,238,.08)); color:var(--ink); box-shadow:inset 2px 0 0 var(--cyan); }
+.nav-item .msr{font-size:19px;}
+.nav-section-title{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); padding:14px 12px 6px;}
+
+.main{ overflow-y:auto; padding:18px; position:relative; }
+.view{ display:none; animation:fadeIn .25s ease; }
+.view.active{ display:block; }
+@keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+.statusbar{ grid-column:1/3; display:flex; align-items:center; gap:16px; padding:0 14px; border-top:1px solid var(--line); background:var(--panel-solid); font-size:11.5px; color:var(--muted);}
+.statusbar span b{ color:var(--ink); }
+.statusbar .spacer{ flex:1; }
+
+/* ---------- Dashboard ---------- */
+.stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px;}
+.stat-card{ padding:16px; position:relative; overflow:hidden;}
+.stat-card .msr{ font-size:26px; color:var(--cyan); }
+.stat-val{ font-family:var(--font-display); font-size:26px; font-weight:700; margin:8px 0 2px;}
+.stat-label{ font-size:12px; color:var(--muted);}
+.quick-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;}
+.section-title{ font-family:var(--font-display); font-size:17px; font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
+.panel{ padding:18px; margin-bottom:18px; }
+
+/* ---------- Table ---------- */
+.toolbar-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px;}
+.table-wrap{ overflow:auto; border-radius:var(--radius); border:1px solid var(--line); }
+table.chtable{ width:100%; border-collapse:collapse; font-size:12.8px; }
+table.chtable thead th{ position:sticky; top:0; background:var(--panel-solid); text-align:left; padding:10px 10px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); border-bottom:1px solid var(--line); z-index:2; white-space:nowrap;}
+table.chtable tbody td{ padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:middle;}
+table.chtable tbody tr{ transition:background .15s; cursor:pointer;}
+table.chtable tbody tr:hover{ background:linear-gradient(90deg, rgba(111,92,255,.08), rgba(34,211,238,.04)); }
+table.chtable tbody tr.selected{ background:rgba(111,92,255,.16); }
+.logo-thumb{ width:26px; height:26px; border-radius:6px; object-fit:cover; background:rgba(255,255,255,.06); border:1px solid var(--line); }
+.badge{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; padding:3px 8px; border-radius:999px; }
+.badge-ok{ background:rgba(47,215,122,.14); color:var(--ok); }
+.badge-bad{ background:rgba(239,75,95,.14); color:var(--danger); }
+.row-actions{ display:flex; gap:4px; }
+.pagination{ display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-top:10px; font-size:12px; color:var(--muted);}
+.pagination button{ background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:7px; width:28px; height:28px; color:var(--ink); }
+.pagination button:disabled{ opacity:.35; cursor:not-allowed; }
+
+/* ---------- Property editor drawer ---------- */
+#propDrawer{ position:fixed; top:56px; right:0; bottom:30px; width:340px; transform:translateX(100%); transition:transform .25s ease; z-index:60; padding:16px; overflow-y:auto; border-radius:14px 0 0 14px;}
+#propDrawer.open{ transform:translateX(0); }
+.drawer-head{ display:flex; align-items:center; justify-content:between; gap:8px; margin-bottom:14px;}
+.drawer-head h3{ font-family:var(--font-display); font-size:15px; flex:1;}
+.form-grid{ display:grid; grid-template-columns:1fr; gap:10px; }
+.form-grid label{ font-size:11.5px; color:var(--muted); display:block; margin-bottom:4px;}
+.form-grid input, .form-grid select, .form-grid textarea{ width:100%; }
+.two-col{ display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+
+/* ---------- Console ---------- */
+#consolePanel{ position:fixed; left:220px; right:0; bottom:30px; height:0; overflow:hidden; transition:height .2s ease; background:#05070b; border-top:1px solid var(--line); z-index:40; font-family:var(--font-mono); font-size:11.5px;}
+#consolePanel.open{ height:190px; }
+.console-head{ display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid var(--line); color:var(--muted);}
+.console-body{ padding:8px 12px; overflow-y:auto; height:calc(100% - 32px);}
+.console-line{ color:#9fb0c8; margin-bottom:3px; }
+.console-line.warn{ color:var(--amber); } .console-line.error{ color:var(--danger);} .console-line.ok{ color:var(--ok);}
+
+/* ---------- Floating buttons ---------- */
+.fab-stack{ position:fixed; right:22px; bottom:46px; display:flex; flex-direction:column-reverse; gap:10px; z-index:55;}
+.fab{ width:48px; height:48px; border-radius:50%; background:var(--grad); border:none; color:#0a0e14; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 22px rgba(111,92,255,.4); transition:transform .15s;}
+.fab:hover{ transform:scale(1.08) rotate(-4deg); }
+.fab[data-fab="add"]{ background:var(--grad); }
+.fab[data-fab="import"]{ background:linear-gradient(120deg,#22d3ee,#2fd77a); }
+.fab[data-fab="export"]{ background:linear-gradient(120deg,#f5a623,#ef4b5f); }
+.fab[data-fab="save"]{ background:linear-gradient(120deg,#6f5cff,#8f6bff); }
+.fab[data-fab="settings"]{ background:rgba(255,255,255,.1); color:var(--ink); box-shadow:none; border:1px solid var(--line);}
+
+/* ---------- Modals ---------- */
+.modal-overlay{ position:fixed; inset:0; background:rgba(4,6,10,.55); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; z-index:200; opacity:0; pointer-events:none; transition:opacity .18s ease;}
+.modal-overlay.open{ opacity:1; pointer-events:auto; }
+.modal{ width:min(560px,92vw); max-height:86vh; overflow-y:auto; padding:22px; transform:translateY(10px); transition:transform .18s ease;}
+.modal-overlay.open .modal{ transform:translateY(0); }
+.modal-head{ display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+.modal-head h3{ font-family:var(--font-display); font-size:17px; flex:1;}
+.modal-foot{ display:flex; justify-content:flex-end; gap:8px; margin-top:18px;}
+.tabs{ display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--line);}
+.tab{ padding:8px 14px; font-size:12.5px; color:var(--muted); border-bottom:2px solid transparent; cursor:pointer;}
+.tab.active{ color:var(--ink); border-color:var(--cyan);}
+.tabpane{ display:none; } .tabpane.active{ display:block; }
+.dropzone{ border:2px dashed var(--line); border-radius:var(--radius); padding:30px 16px; text-align:center; color:var(--muted); font-size:13px; transition:border-color .15s, background .15s;}
+.dropzone.drag{ border-color:var(--cyan); background:rgba(34,211,238,.06); }
+textarea.paste-area{ width:100%; height:140px; resize:vertical; font-family:var(--font-mono); font-size:12px;}
+
+/* ---------- Groups / Logos grids ---------- */
+.group-list{ display:flex; flex-direction:column; gap:8px; }
+.group-row{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius-sm); background:rgba(255,255,255,.03); border:1px solid var(--line);}
+.group-row input[type=checkbox]{ accent-color:var(--violet); }
+.group-row .gname{ flex:1; font-weight:600; font-size:13px;}
+.group-row .gcount{ font-size:11px; color:var(--muted); background:rgba(255,255,255,.05); padding:2px 8px; border-radius:999px;}
+.logo-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:12px;}
+.logo-card{ padding:10px; text-align:center; border-radius:var(--radius-sm); background:rgba(255,255,255,.03); border:1px solid var(--line);}
+.logo-card img{ width:56px; height:56px; object-fit:cover; border-radius:8px; margin-bottom:8px; background:rgba(255,255,255,.06);}
+.logo-card .cnt{ font-size:10.5px; color:var(--muted); margin-bottom:6px;}
+.logo-card input{ width:100%; font-size:10.5px; padding:5px 6px; margin-bottom:6px;}
+
+/* ---------- Toasts ---------- */
+#toastStack{ position:fixed; top:66px; right:18px; display:flex; flex-direction:column; gap:8px; z-index:400; }
+.toast{ padding:12px 16px; border-radius:11px; min-width:240px; max-width:340px; font-size:13px; display:flex; align-items:center; gap:8px; animation:toastIn .25s ease; }
+@keyframes toastIn{ from{opacity:0; transform:translateX(20px);} to{opacity:1; transform:translateX(0);} }
+.toast.ok{ border-left:3px solid var(--ok);} .toast.error{ border-left:3px solid var(--danger);} .toast.warn{ border-left:3px solid var(--amber);} .toast.info{ border-left:3px solid var(--cyan);}
+
+/* ---------- loading overlay ---------- */
+#loadingOverlay{ position:fixed; inset:0; background:rgba(4,6,10,.5); display:none; align-items:center; justify-content:center; z-index:500;}
+#loadingOverlay.show{ display:flex; }
+.spinner{ width:44px; height:44px; border-radius:50%; border:3px solid rgba(255,255,255,.15); border-top-color:var(--cyan); animation:spin .8s linear infinite;}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* ---------- misc ---------- */
+.muted{ color:var(--muted); }
+.mono{ font-family:var(--font-mono); }
+.small{ font-size:11.5px; }
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.kv-row{ display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line); font-size:12.5px;}
+.switch{ position:relative; width:38px; height:22px; }
+.switch input{ opacity:0; width:0; height:0; }
+.switch .slider{ position:absolute; inset:0; background:rgba(255,255,255,.12); border-radius:999px; transition:.2s; }
+.switch .slider:before{ content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s;}
+.switch input:checked + .slider{ background:var(--grad); }
+.switch input:checked + .slider:before{ transform:translateX(16px); }
+.kbd{ font-family:var(--font-mono); background:rgba(255,255,255,.08); border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:11px; }
+
+@media (max-width:920px){
+  #app{ grid-template-columns:1fr; }
+  .sidebar{ position:fixed; left:0; top:56px; bottom:30px; width:220px; transform:translateX(-100%); transition:transform .2s; }
+  .sidebar.open{ transform:translateX(0); }
+  #propDrawer{ width:100%; border-radius:0; top:56px;}
+  #consolePanel{ left:0; }
+  .searchbox{ display:none; }
+  .brand span.brand-text{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ LOGIN ============================================================ -->
+<div id="loginScreen">
+  <div class="login-card glass">
+    <div class="login-logo"><div class="bars"><span></span><span></span><span></span><span></span></div>GoM3U Studio</div>
+    <div class="login-sub">Advanced M3U Playlist Editor</div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="field"><label>Username</label><input type="text" id="loginUser" autocomplete="username" placeholder="gom3u"></div>
+    <div class="field"><label>Password</label><input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••"></div>
+    <div class="check-row"><input type="checkbox" id="rememberMe" checked><label for="rememberMe">Remember me on this device</label></div>
+    <button class="btn btn-primary btn-block" id="loginBtn"><span class="msr">login</span> Sign In</button>
+  </div>
+</div>
+
+<!-- ============================================================ APP ============================================================ -->
+<div id="app">
+  <div class="topbar">
+    <div class="brand"><div class="bars"><span></span><span></span><span></span></div><span class="brand-text">GoM3U Studio</span></div>
+    <button class="icon-btn" id="sidebarToggle" title="Menu"><span class="msr">menu</span></button>
+    <div class="searchbox"><span class="msr">search</span><input type="text" id="globalSearch" placeholder="Search channels, groups, urls… (Ctrl+F)"></div>
+    <div class="top-actions">
+      <span class="online-dot" id="onlineDot" title="Online status"></span>
+      <button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)"><span class="msr">undo</span></button>
+      <button class="icon-btn" id="redoBtn" title="Redo (Ctrl+Y)"><span class="msr">redo</span></button>
+      <button class="icon-btn" id="consoleToggle" title="Console log"><span class="msr">terminal</span></button>
+      <button class="icon-btn" id="themeToggle" title="Toggle theme"><span class="msr">dark_mode</span></button>
+      <button class="btn btn-primary" id="saveBtn"><span class="msr">save</span> Save</button>
+      <button class="icon-btn" id="logoutBtn" title="Log out"><span class="msr">logout</span></button>
+    </div>
+  </div>
+
+  <div class="sidebar" id="sidebar">
+    <div class="nav-item active" data-view="dashboard"><span class="msr">dashboard</span> Dashboard</div>
+    <div class="nav-item" data-view="import"><span class="msr">file_upload</span> Playlist Import</div>
+    <div class="nav-item" data-view="channels"><span class="msr">list_alt</span> Channel Editor</div>
+    <div class="nav-item" data-view="groups"><span class="msr">folder_open</span> Group Manager</div>
+    <div class="nav-item" data-view="logos"><span class="msr">image</span> Logo Manager</div>
+    <div class="nav-item" data-view="bulk"><span class="msr">bolt</span> Bulk Tools</div>
+    <div class="nav-item" data-view="tools"><span class="msr">build</span> Playlist Tools</div>
+    <div class="nav-item" data-view="export"><span class="msr">download</span> Export</div>
+    <div class="nav-section-title">Integrations</div>
+    <div class="nav-item" data-view="github"><span class="msr">hub</span> GitHub Sync</div>
+    <div class="nav-item" data-view="settings"><span class="msr">settings</span> Settings</div>
+  </div>
+
+  <div class="main" id="mainArea">
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div class="section-title"><span class="msr">dashboard</span> Dashboard</div>
+      <div class="stat-grid">
+        <div class="stat-card glass"><span class="msr">live_tv</span><div class="stat-val" id="statChannels">0</div><div class="stat-label">Total Channels</div></div>
+        <div class="stat-card glass"><span class="msr">folder</span><div class="stat-val" id="statGroups">0</div><div class="stat-label">Total Groups</div></div>
+        <div class="stat-card glass"><span class="msr">image</span><div class="stat-val" id="statLogos">0</div><div class="stat-label">Total Logos</div></div>
+        <div class="stat-card glass"><span class="msr">error</span><div class="stat-val" id="statInvalid">0</div><div class="stat-label">Invalid Streams</div></div>
+        <div class="stat-card glass"><span class="msr">content_copy</span><div class="stat-val" id="statDup">0</div><div class="stat-label">Duplicate Channels</div></div>
+        <div class="stat-card glass"><span class="msr">schedule</span><div class="stat-val" id="statModified" style="font-size:15px;">—</div><div class="stat-label">Last Modified</div></div>
+      </div>
+      <div class="section-title"><span class="msr">flash_on</span> Quick Actions</div>
+      <div class="quick-actions">
+        <button class="btn btn-primary" data-qa="import"><span class="msr">file_upload</span> Import Playlist</button>
+        <button class="btn" data-qa="add"><span class="msr">add</span> Add Channel</button>
+        <button class="btn" data-qa="validate"><span class="msr">verified</span> Validate Playlist</button>
+        <button class="btn" data-qa="clean"><span class="msr">cleaning_services</span> Clean Playlist</button>
+        <button class="btn" data-qa="export"><span class="msr">download</span> Export</button>
+        <button class="btn" data-qa="backup"><span class="msr">backup</span> Backup Now</button>
+      </div>
+      <div class="panel glass">
+        <div class="section-title" style="margin-bottom:10px;"><span class="msr">insights</span> Playlist Statistics</div>
+        <div class="grid2" id="dashStats"></div>
+      </div>
+    </div>
+
+    <!-- IMPORT -->
+    <div class="view" id="view-import">
+      <div class="section-title"><span class="msr">file_upload</span> Playlist Import</div>
+      <div class="tabs">
+        <div class="tab active" data-tab="importUrl">M3U URL</div>
+        <div class="tab" data-tab="importFile">Local File / Drag &amp; Drop</div>
+        <div class="tab" data-tab="importPaste">Paste M3U Text</div>
+      </div>
+      <div class="panel glass">
+        <div class="tabpane active" id="tab-importUrl">
+          <div class="field"><label>M3U URL</label><input type="text" id="importUrlInput" placeholder="https://example.com/playlist.m3u"></div>
+          <button class="btn btn-primary" id="importUrlBtn"><span class="msr">cloud_download</span> Fetch &amp; Parse</button>
+          <p class="small muted" style="margin-top:10px;">Fetching requires the remote server to allow cross-origin requests (CORS). If it fails, download the file and use the Local File tab instead.</p>
+        </div>
+        <div class="tabpane" id="tab-importFile">
+          <div class="dropzone" id="dropZone">
+            <span class="msr" style="font-size:34px;">cloud_upload</span>
+            <p style="margin-top:8px;">Drag &amp; drop your .m3u / .m3u8 file here, or click to browse</p>
+            <input type="file" id="fileInput" accept=".m3u,.m3u8,.txt" class="hidden">
+          </div>
+        </div>
+        <div class="tabpane" id="tab-importPaste">
+          <div class="field"><label>Paste M3U content (UTF-8)</label><textarea class="paste-area" id="pasteArea" placeholder="#EXTM3U&#10;#EXTINF:-1 group-title=&quot;News&quot;,Channel One&#10;https://stream.url/1.m3u8"></textarea></div>
+          <button class="btn btn-primary" id="pasteImportBtn"><span class="msr">bolt</span> Auto Parse</button>
+        </div>
+      </div>
+      <div class="panel glass" id="importSummary" style="display:none;"></div>
+    </div>
+
+    <!-- CHANNEL EDITOR -->
+    <div class="view" id="view-channels">
+      <div class="section-title"><span class="msr">list_alt</span> Channel Editor</div>
+      <div class="toolbar-row">
+        <button class="btn btn-primary" id="addChannelBtn"><span class="msr">add</span> Add Channel</button>
+        <button class="btn" id="bulkEditBtn"><span class="msr">edit_note</span> Bulk Edit</button>
+        <button class="btn" id="dupSelectedBtn"><span class="msr">content_copy</span> Duplicate</button>
+        <button class="btn" id="copySelectedBtn"><span class="msr">assignment</span> Copy</button>
+        <button class="btn btn-danger" id="deleteSelectedBtn"><span class="msr">delete</span> Delete</button>
+        <select id="groupFilter" style="margin-left:auto;"><option value="">All Groups</option></select>
+        <select id="pageSizeSelect">
+          <option value="50">50 / page</option><option value="100" selected>100 / page</option><option value="250">250 / page</option><option value="500">500 / page</option>
+        </select>
+      </div>
+      <div class="table-wrap glass">
+        <table class="chtable">
+          <thead><tr>
+            <th><input type="checkbox" id="selectAllChk"></th>
+            <th>Logo</th><th>Name</th><th>Group</th><th>URL</th><th>Status</th><th style="text-align:right;">Actions</th>
+          </tr></thead>
+          <tbody id="channelTbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="rangeLabel" class="muted"></span>
+        <button id="firstPageBtn"><span class="msr" style="font-size:16px;">first_page</span></button>
+        <button id="prevPageBtn"><span class="msr" style="font-size:16px;">chevron_left</span></button>
+        <span id="pageLabel">1 / 1</span>
+        <button id="nextPageBtn"><span class="msr" style="font-size:16px;">chevron_right</span></button>
+        <button id="lastPageBtn"><span class="msr" style="font-size:16px;">last_page</span></button>
+      </div>
+    </div>
+
+    <!-- GROUP MANAGER -->
+    <div class="view" id="view-groups">
+      <div class="section-title"><span class="msr">folder_open</span> Group Manager</div>
+      <div class="toolbar-row">
+        <button class="btn" id="sortGroupsBtn"><span class="msr">sort_by_alpha</span> Sort Groups</button>
+        <button class="btn" id="mergeGroupsBtn"><span class="msr">call_merge</span> Merge Selected</button>
+        <button class="btn btn-danger" id="deleteEmptyGroupsBtn"><span class="msr">delete_sweep</span> Delete Empty Groups</button>
+        <button class="btn" id="collapseAllBtn"><span class="msr">unfold_less</span> Collapse/Expand All</button>
+      </div>
+      <div class="panel glass"><div class="group-list" id="groupList"></div></div>
+    </div>
+
+    <!-- LOGO MANAGER -->
+    <div class="view" id="view-logos">
+      <div class="section-title"><span class="msr">image</span> Logo Manager</div>
+      <div class="toolbar-row">
+        <button class="btn" id="detectBrokenBtn"><span class="msr">broken_image</span> Detect Broken Logos</button>
+        <button class="btn" id="applyDefaultLogoBtn"><span class="msr">image_not_supported</span> Apply Default Logo to Broken</button>
+        <input type="text" id="bulkLogoFind" placeholder="Find text in logo URL">
+        <input type="text" id="bulkLogoReplace" placeholder="Replace with">
+        <button class="btn btn-primary" id="bulkLogoReplaceBtn"><span class="msr">find_replace</span> Bulk Replace</button>
+      </div>
+      <div class="panel glass"><div class="logo-grid" id="logoGrid"></div></div>
+    </div>
+
+    <!-- BULK TOOLS -->
+    <div class="view" id="view-bulk">
+      <div class="section-title"><span class="msr">bolt</span> Bulk Tools</div>
+      <div class="grid2">
+        <div class="panel glass">
+          <div class="section-title" style="font-size:14px;"><span class="msr">find_replace</span> Find &amp; Replace</div>
+          <div class="field"><label>Field</label><select id="frField"><option value="name">Channel Name</option><option value="url">Stream URL</option><option value="group">Group Title</option><option value="logo">Logo URL</option><option value="all">All Text Fields</option></select></div>
+          <div class="field"><label>Find</label><input type="text" id="frFind"></div>
+          <div class="field"><label>Replace</label><input type="text" id="frReplace"></div>
+          <button class="btn btn-primary btn-block" id="frBtn"><span class="msr">bolt</span> Apply</button>
+        </div>
+        <div class="panel glass">
+          <div class="section-title" style="font-size:14px;"><span class="msr">public</span> Replace Domain</div>
+          <div class="field"><label>Old Domain (e.g. old.com)</label><input type="text" id="domOld"></div>
+          <div class="field"><label>New Domain (e.g. new.com)</label><input type="text" id="domNew"></div>
+          <button class="btn btn-primary btn-block" id="domBtn"><span class="msr">swap_horiz</span> Replace Domain</button>
+        </div>
+        <div class="panel glass">
+          <div class="section-title" style="font-size:14px;"><span class="msr">text_fields</span> Prefix / Suffix</div>
+          <div class="field"><label>Prefix for Channel Name</label><input type="text" id="prefixInput"></div>
+          <div class="field"><label>Suffix for Channel Name</label><input type="text" id="suffixInput"></div>
+          <button class="btn btn-primary btn-block" id="prefixSuffixBtn"><span class="msr">bolt</span> Apply to All Channels</button>
+        </div>
+        <div class="panel glass">
+          <div class="section-title" style="font-size:14px;"><span class="msr">cleaning_services</span> Cleanup</div>
+          <button class="btn btn-block" id="removeDupBtn" style="margin-bottom:8px;"><span class="msr">content_copy</span> Remove Duplicate Channels</button>
+          <button class="btn btn-block" id="removeEmptyBtn" style="margin-bottom:8px;"><span class="msr">delete</span> Remove Empty Channels</button>
+          <button class="btn btn-block" id="removeInvalidBtn" style="margin-bottom:8px;"><span class="msr">link_off</span> Remove Invalid URLs</button>
+          <button class="btn btn-block" id="sortChannelsBtn" style="margin-bottom:8px;"><span class="msr">sort_by_alpha</span> Sort Channels (A–Z)</button>
+          <button class="btn btn-block" id="sortGroupsBtn2"><span class="msr">sort</span> Sort Groups (A–Z)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PLAYLIST TOOLS -->
+    <div class="view" id="view-tools">
+      <div class="section-title"><span class="msr">build</span> Playlist Tools</div>
+      <div class="quick-actions">
+        <button class="btn btn-primary" id="validateBtn"><span class="msr">verified</span> Validate Playlist</button>
+        <button class="btn" id="fixFormatBtn"><span class="msr">auto_fix_high</span> Fix Formatting</button>
+        <button class="btn" id="cleanPlaylistBtn"><span class="msr">cleaning_services</span> Clean Playlist</button>
+        <button class="btn" id="detectErrorsBtn"><span class="msr">bug_report</span> Detect Errors</button>
+      </div>
+      <div class="panel glass">
+        <div class="section-title" style="font-size:14px;"><span class="msr">insights</span> Statistics Report</div>
+        <div id="toolsReport" class="small mono muted">Run a tool above to see a report here.</div>
+      </div>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="view" id="view-export">
+      <div class="section-title"><span class="msr">download</span> Export</div>
+      <div class="panel glass">
+        <div class="tabs">
+          <div class="tab active" data-etab="m3u">M3U</div>
+          <div class="tab" data-etab="txt">TXT</div>
+          <div class="tab" data-etab="json">JSON</div>
+        </div>
+        <textarea class="paste-area" id="exportPreview" style="height:260px;" readonly></textarea>
+        <div class="quick-actions" style="margin-top:12px;">
+          <button class="btn btn-primary" id="downloadExportBtn"><span class="msr">download</span> Download</button>
+          <button class="btn" id="copyExportBtn"><span class="msr">content_copy</span> Copy</button>
+          <button class="btn" id="saveExportBtn"><span class="msr">save</span> Save Snapshot</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GITHUB -->
+    <div class="view" id="view-github">
+      <div class="section-title"><span class="msr">hub</span> GitHub Integration</div>
+      <div class="panel glass">
+        <div class="grid2">
+          <div class="field"><label>Repository (owner/repo)</label><input type="text" id="ghRepo" placeholder="username/my-playlists"></div>
+          <div class="field"><label>Branch</label><input type="text" id="ghBranch" placeholder="main"></div>
+          <div class="field"><label>File Path</label><input type="text" id="ghPath" placeholder="playlist.m3u"></div>
+          <div class="field"><label>Personal Access Token</label><input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxx"></div>
+        </div>
+        <div class="field"><label>Commit Message</label><input type="text" id="ghCommitMsg" placeholder="Update playlist via GoM3U Studio"></div>
+        <div class="check-row"><label class="switch"><input type="checkbox" id="ghAutoSave"><span class="slider"></span></label> Auto Save (push on every change, debounced)</div>
+        <div class="quick-actions">
+          <button class="btn btn-primary" id="ghPushBtn"><span class="msr">cloud_upload</span> Push Playlist</button>
+          <button class="btn" id="ghPullBtn"><span class="msr">cloud_download</span> Pull Playlist</button>
+          <button class="btn" id="ghSaveSettingsBtn"><span class="msr">save</span> Save Settings</button>
+        </div>
+        <p class="small muted" style="margin-top:10px;">Tokens are stored only in this browser's LocalStorage and sent directly to api.github.com — never to any third-party server.</p>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings">
+      <div class="section-title"><span class="msr">settings</span> Settings</div>
+      <div class="panel glass">
+        <div class="grid2">
+          <div class="field"><label>Theme</label><select id="settingTheme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+          <div class="field"><label>Font Size</label><input type="range" id="settingFontSize" min="12" max="18" value="14"></div>
+          <div class="field"><label>Default Logo URL</label><input type="text" id="settingDefaultLogo" placeholder="https://example.com/default-logo.png"></div>
+          <div class="field"><label>Default Group Name</label><input type="text" id="settingDefaultGroup" placeholder="Uncategorized"></div>
+        </div>
+        <div class="check-row"><label class="switch"><input type="checkbox" id="settingAutoSave" checked><span class="slider"></span></label> Auto Save to LocalStorage</div>
+        <div class="check-row"><label class="switch"><input type="checkbox" id="settingConfirmDelete" checked><span class="slider"></span></label> Confirm Before Delete</div>
+        <div class="quick-actions">
+          <button class="btn btn-primary" id="saveSettingsBtn"><span class="msr">save</span> Save Settings</button>
+          <button class="btn" id="backupNowBtn"><span class="msr">backup</span> Create Backup</button>
+          <button class="btn" id="restoreBackupBtn"><span class="msr">restore</span> Restore Backup</button>
+          <button class="btn btn-danger" id="resetProjectBtn"><span class="msr">delete_forever</span> Reset Project</button>
+        </div>
+      </div>
+      <div class="panel glass">
+        <div class="section-title" style="font-size:14px;"><span class="msr">keyboard</span> Keyboard Shortcuts</div>
+        <div class="kv-row"><span>Save</span><span class="kbd">Ctrl+S</span></div>
+        <div class="kv-row"><span>Import</span><span class="kbd">Ctrl+O</span></div>
+        <div class="kv-row"><span>Search</span><span class="kbd">Ctrl+F</span></div>
+        <div class="kv-row"><span>Undo</span><span class="kbd">Ctrl+Z</span></div>
+        <div class="kv-row"><span>Redo</span><span class="kbd">Ctrl+Y</span></div>
+        <div class="kv-row"><span>Remove Selected</span><span class="kbd">Delete</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PROPERTY EDITOR DRAWER -->
+  <div id="propDrawer" class="glass">
+    <div class="drawer-head">
+      <h3 id="drawerTitle">Channel Properties</h3>
+      <button class="icon-btn" id="closeDrawerBtn"><span class="msr">close</span></button>
+    </div>
+    <div class="form-grid" id="drawerForm"></div>
+    <div class="quick-actions" style="margin-top:14px;">
+      <button class="btn btn-primary btn-block" id="drawerSaveBtn"><span class="msr">check</span> Apply</button>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span><span class="msr" style="font-size:14px;">live_tv</span> <b id="sbChannels">0</b> channels</span>
+    <span><span class="msr" style="font-size:14px;">folder</span> <b id="sbGroups">0</b> groups</span>
+    <span><span class="msr" style="font-size:14px;">check_circle</span> Selected: <b id="sbSelected">0</b></span>
+    <span class="spacer"></span>
+    <span id="sbSavedAt">Not saved yet</span>
+    <span class="mono">GoM3U Studio v1.0.0</span>
+  </div>
+</div>
+
+<!-- CONSOLE LOG -->
+<div id="consolePanel">
+  <div class="console-head"><span class="msr" style="font-size:16px;">terminal</span> Console Log <button class="icon-btn" style="margin-left:auto;" id="clearConsoleBtn"><span class="msr" style="font-size:16px;">clear_all</span></button></div>
+  <div class="console-body" id="consoleBody"></div>
+</div>
+
+<!-- FLOATING ACTION BUTTONS -->
+<div class="fab-stack">
+  <button class="fab" data-fab="settings" title="Settings"><span class="msr">settings</span></button>
+  <button class="fab" data-fab="save" title="Save"><span class="msr">save</span></button>
+  <button class="fab" data-fab="export" title="Export"><span class="msr">download</span></button>
+  <button class="fab" data-fab="import" title="Import"><span class="msr">file_upload</span></button>
+  <button class="fab" data-fab="add" title="Add Channel"><span class="msr">add</span></button>
+</div>
+
+<!-- BULK EDIT MODAL -->
+<div class="modal-overlay" id="bulkEditModal">
+  <div class="modal glass">
+    <div class="modal-head"><span class="msr">edit_note</span><h3>Bulk Edit Selected Channels</h3><button class="icon-btn modal-close"><span class="msr">close</span></button></div>
+    <div class="form-grid">
+      <div class="field"><label>Set Group Title (leave blank to skip)</label><input type="text" id="bulkGroup"></div>
+      <div class="field"><label>Set tvg-country (leave blank to skip)</label><input type="text" id="bulkCountry"></div>
+      <div class="field"><label>Set tvg-language (leave blank to skip)</label><input type="text" id="bulkLanguage"></div>
+      <div class="field"><label>Set User-Agent (leave blank to skip)</label><input type="text" id="bulkUA"></div>
+      <div class="field"><label>Set Referrer (leave blank to skip)</label><input type="text" id="bulkReferrer"></div>
+      <div class="field"><label>Set Catchup (leave blank to skip)</label><input type="text" id="bulkCatchup" placeholder="default / shift / append"></div>
+    </div>
+    <div class="modal-foot"><button class="btn modal-close">Cancel</button><button class="btn btn-primary" id="bulkEditApplyBtn"><span class="msr">check</span> Apply to Selected</button></div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal glass" style="width:380px;">
+    <div class="modal-head"><span class="msr">warning</span><h3 id="confirmTitle">Confirm Action</h3></div>
+    <p id="confirmMsg" class="small muted"></p>
+    <div class="modal-foot"><button class="btn modal-close">Cancel</button><button class="btn btn-danger" id="confirmOkBtn">Confirm</button></div>
+  </div>
+</div>
+
+<div id="loadingOverlay"><div class="spinner"></div></div>
+<div id="toastStack"></div>
+
+<script>
+/* ==========================================================================================
+   GoM3U STUDIO — Application JavaScript
+   Organized into small self-contained modules attached to the App namespace.
+   ========================================================================================== */
+(function(){
+"use strict";
+
+const APP_VERSION = "1.0.0";
+const LS_KEYS = {
+  AUTH:"gom3u_auth", CHANNELS:"gom3u_channels", SETTINGS:"gom3u_settings",
+  GITHUB:"gom3u_github", BACKUP:"gom3u_backup", GROUP_META:"gom3u_group_meta", LAST_MOD:"gom3u_last_modified"
+};
+const DEFAULT_CREDS = { user:"gom3u", pass:"Asad5141#" };
+
+/* ---------------------------------------------------------------------
+   Utility helpers
+--------------------------------------------------------------------- */
+const Util = {
+  uid(){ return 'c_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); },
+  escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+  escapeAttr(s){ return (s==null?'':String(s)).replace(/"/g,'&quot;'); },
+  isValidUrl(u){ if(!u) return false; return /^(https?|rtmp|rtsp|udp|rtp):\/\/.+/i.test(u.trim()); },
+  debounce(fn, wait){ let t; return function(...a){ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a), wait); }; },
+  clone(obj){ return JSON.parse(JSON.stringify(obj)); },
+  nowStr(){ return new Date().toLocaleString(); },
+  domainOf(url){ try{ return new URL(url).hostname; }catch(e){ return ''; } },
+  download(filename, content, mime){
+    const blob = new Blob([content], {type: mime || 'text/plain;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+  },
+  copyToClipboard(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){ return navigator.clipboard.writeText(text); }
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    return Promise.resolve();
+  }
+};
+
+/* ---------------------------------------------------------------------
+   Toast module
+--------------------------------------------------------------------- */
+const Toast = {
+  stack: null,
+  init(){ this.stack = document.getElementById('toastStack'); },
+  show(msg, type='info', ms=3200){
+    const icons = {ok:'check_circle', error:'error', warn:'warning', info:'info'};
+    const el = document.createElement('div');
+    el.className = 'toast glass ' + type;
+    el.innerHTML = '<span class="msr">'+(icons[type]||'info')+'</span><span>'+Util.escapeHtml(msg)+'</span>';
+    this.stack.appendChild(el);
+    setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(20px)'; setTimeout(()=>el.remove(),250); }, ms);
+  }
+};
+
+/* ---------------------------------------------------------------------
+   Console log module
+--------------------------------------------------------------------- */
+const Log = {
+  body: null,
+  init(){
+    this.body = document.getElementById('consoleBody');
+    document.getElementById('consoleToggle').addEventListener('click', ()=>{
+      document.getElementById('consolePanel').classList.toggle('open');
+    });
+    document.getElementById('clearConsoleBtn').addEventListener('click', ()=>{ this.body.innerHTML=''; });
+  },
+  add(msg, level='info'){
+    const line = document.createElement('div');
+    line.className = 'console-line ' + (level==='error'?'error':level==='warn'?'warn':level==='ok'?'ok':'');
+    const t = new Date().toLocaleTimeString();
+    line.textContent = '['+t+'] '+msg;
+    this.body.appendChild(line);
+    this.body.scrollTop = this.body.scrollHeight;
+  }
+};
+
+/* ---------------------------------------------------------------------
+   Auth module
+--------------------------------------------------------------------- */
+const Auth = {
+  init(){
+    const saved = localStorage.getItem(LS_KEYS.AUTH);
+    if(saved === '1'){ this.enter(); return; }
+    document.getElementById('loginBtn').addEventListener('click', ()=>this.tryLogin());
+    document.getElementById('loginPass').addEventListener('keydown', e=>{ if(e.key==='Enter') this.tryLogin(); });
+  },
+  tryLogin(){
+    const u = document.getElementById('loginUser').value.trim();
+    const p = document.getElementById('loginPass').value;
+    const remember = document.getElementById('rememberMe').checked;
+    const err = document.getElementById('loginErr');
+    if(u === DEFAULT_CREDS.user && p === DEFAULT_CREDS.pass){
+      err.textContent = '';
+      if(remember) localStorage.setItem(LS_KEYS.AUTH, '1');
+      this.enter();
+    } else {
+      err.textContent = 'Invalid username or password.';
+    }
+  },
+  enter(){
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').classList.add('show');
+    App.boot();
+  },
+  logout(){
+    localStorage.removeItem(LS_KEYS.AUTH);
+    location.reload();
+  }
+};
+
+/* ---------------------------------------------------------------------
+   M3U Parser / Serializer module
+--------------------------------------------------------------------- */
+const M3U = {
+  // Parse raw M3U text into an array of channel objects
+  parse(text){
+    const channels = [];
+    const lines = text.replace(/\r\n/g,'\n').split('\n');
+    let pending = null;
+    for(let raw of lines){
+      const line = raw.trim();
+      if(!line) continue;
+      if(line.startsWith('#EXTM3U')) continue;
+      if(line.startsWith('#EXTINF')){
+        pending = this._parseExtinf(line);
+      } else if(line.startsWith('#EXTVLCOPT')){
+        if(pending){
+          const m = line.match(/#EXTVLCOPT:([^=]+)=(.*)/i);
+          if(m){
+            const key = m[1].trim().toLowerCase();
+            const val = m[2].trim();
+            if(key === 'http-user-agent') pending.userAgent = val;
+            if(key === 'http-referrer') pending.referrer = val;
+          }
+        }
+      } else if(line.startsWith('#KODIPROP') || line.startsWith('#DRM-LICENSE')){
+        if(pending){
+          const m = line.match(/[:=](.*)$/);
+          if(m) pending.drmKey = m[1].trim();
+        }
+      } else if(line.startsWith('#')){
+        // unknown directive, ignore but keep in log
+      } else {
+        // this is the stream URL line
+        if(pending){
+          pending.url = line;
+          pending.id = Util.uid();
+          channels.push(pending);
+          pending = null;
+        }
+      }
+    }
+    return channels;
+  },
+  _parseExtinf(line){
+    // #EXTINF:-1 tvg-id="x" tvg-name="y" tvg-logo="z" group-title="g" catchup="default",Channel Name
+    const c = { id:null, name:'', url:'', logo:'', group:'', tvgId:'', tvgName:'', tvgLogo:'',
+      tvgCountry:'', tvgLanguage:'', userAgent:'', referrer:'', catchup:'', catchupDays:'', drmKey:'' };
+    const commaIdx = line.lastIndexOf(',');
+    const attrsPart = commaIdx>-1 ? line.slice(0, commaIdx) : line;
+    c.name = commaIdx>-1 ? line.slice(commaIdx+1).trim() : '';
+    const attrRegex = /([a-zA-Z0-9\-]+)="([^"]*)"/g;
+    let m;
+    while((m = attrRegex.exec(attrsPart)) !== null){
+      const key = m[1].toLowerCase();
+      const val = m[2];
+      switch(key){
+        case 'tvg-id': c.tvgId = val; break;
+        case 'tvg-name': c.tvgName = val; break;
+        case 'tvg-logo': c.tvgLogo = val; c.logo = val; break;
+        case 'tvg-country': c.tvgCountry = val; break;
+        case 'tvg-language': c.tvgLanguage = val; break;
+        case 'group-title': c.group = val; break;
+        case 'catchup': c.catchup = val; break;
+        case 'catchup-days': c.catchupDays = val; break;
+      }
+    }
+    if(!c.tvgName) c.tvgName = c.name;
+    return c;
+  },
+  // Serialize channel array back to M3U text
+  serialize(channels){
+    let out = '#EXTM3U\n';
+    for(const c of channels){
+      let attrs = ' tvg-id="'+(c.tvgId||'')+'" tvg-name="'+(c.tvgName||c.name||'')+'" tvg-logo="'+(c.tvgLogo||c.logo||'')+'"';
+      if(c.tvgCountry) attrs += ' tvg-country="'+c.tvgCountry+'"';
+      if(c.tvgLanguage) attrs += ' tvg-language="'+c.tvgLanguage+'"';
+      attrs += ' group-title="'+(c.group||'')+'"';
+      if(c.catchup) attrs += ' catchup="'+c.catchup+'"';
+      if(c.catchupDays) attrs += ' catchup-days="'+c.catchupDays+'"';
+      out += '#EXTINF:-1'+attrs+','+(c.name||'')+'\n';
+      if(c.userAgent) out += '#EXTVLCOPT:http-user-agent='+c.userAgent+'\n';
+      if(c.referrer) out += '#EXTVLCOPT:http-referrer='+c.referrer+'\n';
+      if(c.drmKey) out += '#DRM-LICENSE:'+c.drmKey+'\n';
+      out += (c.url||'')+'\n';
+    }
+    return out;
+  },
+  toTxt(channels){
+    return channels.map(c=> (c.name||'Unnamed') + ' | ' + (c.group||'Uncategorized') + ' | ' + (c.url||'') ).join('\n');
+  },
+  toJson(channels){
+    return JSON.stringify(channels, null, 2);
+  }
+};
+
+/* ---------------------------------------------------------------------
+   Store module — single source of truth + undo/redo + persistence
+--------------------------------------------------------------------- */
+const Store = {
+  channels: [],
+  groupMeta: {}, // groupName -> { collapsed:boolean }
+  settings: { theme:'dark', fontSize:14, defaultLogo:'', defaultGroup:'Uncategorized', autoSave:true, confirmDelete:true },
+  github: { repo:'', branch:'main', path:'playlist.m3u', token:'', autoSave:false },
+  history: [], future: [],
+  lastModified: null,
+  HISTORY_LIMIT: 40,
+
+  init(){
+    const rawCh = localStorage.getItem(LS_KEYS.CHANNELS);
+    this.channels = rawCh ? JSON.parse(rawCh) : [];
+    const rawSettings = localStorage.getItem(LS_KEYS.SETTINGS);
+    if(rawSettings) Object.assign(this.settings, JSON.parse(rawSettings));
+    const rawGh = localStorage.getItem(LS_KEYS.GITHUB);
+    if(rawGh) Object.assign(this.github, JSON.parse(rawGh));
+    const rawMeta = localStorage.getItem(LS_KEYS.GROUP_META);
+    if(rawMeta) this.groupMeta = JSON.parse(rawMeta);
+    this.lastModified = localStorage.getItem(LS_KEYS.LAST_MOD) || null;
+  },
+
+  // push current state snapshot to history before a mutation
+  snapshot(){
+    this.history.push(Util.clone(this.channels));
+    if(this.history.length > this.HISTORY_LIMIT) this.history.shift();
+    this.future = [];
+  },
+  undo(){
+    if(!this.history.length){ Toast.show('Nothing to undo','warn'); return; }
+    this.future.push(Util.clone(this.channels));
+    this.channels = this.history.pop();
+    this.touch(); UI.refreshAll();
+    Toast.show('Undo applied','info');
+  },
+  redo(){
+    if(!this.future.length){ Toast.show('Nothing to redo','warn'); return; }
+    this.history.push(Util.clone(this.channels));
+    this.channels = this.future.pop();
+    this.touch(); UI.refreshAll();
+    Toast.show('Redo applied','info');
+  },
+
+  touch(){
+    this.lastModified = new Date().toISOString();
+    if(this.settings.autoSave) this.persist();
+  },
+
+  persist(){
+    localStorage.setItem(LS_KEYS.CHANNELS, JSON.stringify(this.channels));
+    localStorage.setItem(LS_KEYS.SETTINGS, JSON.stringify(this.settings));
+    localStorage.setItem(LS_KEYS.GITHUB, JSON.stringify(this.github));
+    localStorage.setItem(LS_KEYS.GROUP_META, JSON.stringify(this.groupMeta));
+    localStorage.setItem(LS_KEYS.LAST_MOD, this.lastModified || '');
+    document.getElementById('sbSavedAt').textContent = 'Saved ' + new Date().toLocaleTimeString();
+    Log.add('Project saved to LocalStorage.', 'ok');
+  },
+
+  backup(){
+    localStorage.setItem(LS_KEYS.BACKUP, JSON.stringify({ channels:this.channels, settings:this.settings, groupMeta:this.groupMeta, at:new Date().toISOString() }));
+    Toast.show('Backup created','ok');
+    Log.add('Backup snapshot created.', 'ok');
+  },
+  restoreBackup(){
+    const raw = localStorage.getItem(LS_KEYS.BACKUP);
+    if(!raw){ Toast.show('No backup found','error'); return; }
+    const b = JSON.parse(raw);
+    this.snapshot();
+    this.channels = b.channels || [];
+    this.settings = Object.assign(this.settings, b.settings||{});
+    this.groupMeta = b.groupMeta || {};
+    this.touch(); UI.refreshAll();
+    Toast.show('Backup restored','ok');
+    Log.add('Backup restored from '+ (b.at||'unknown time'), 'ok');
+  },
+  resetProject(){
+    this.channels = []; this.history = []; this.future = []; this.groupMeta = {};
+    this.lastModified = new Date().toISOString();
+    this.persist(); UI.refreshAll();
+    Toast.show('Project reset','ok');
+    Log.add('Project has been reset.', 'warn');
+  },
+
+  // ------ derived data ------
+  groups(){
+    const set = new Set();
+    this.channels.forEach(c=> set.add(c.group || this.settings.defaultGroup || 'Uncategorized'));
+    return Array.from(set).sort();
+  },
+  groupCounts(){
+    const map = {};
+    this.channels.forEach(c=>{
+      const g = c.group || this.settings.defaultGroup || 'Uncategorized';
+      map[g] = (map[g]||0)+1;
+    });
+    return map;
+  },
+  uniqueLogos(){
+    const map = {};
+    this.channels.forEach(c=>{
+      const l = c.logo || c.tvgLogo;
+      if(!l) return;
+      map[l] = (map[l]||0)+1;
+    });
+    return map;
+  },
+  invalidCount(){
+    return this.channels.filter(c=> !Util.isValidUrl(c.url)).length;
+  },
+  duplicateCount(){
+    const seen = {}; let dup=0;
+    this.channels.forEach(c=>{
+      const key = (c.url||'').trim().toLowerCase();
+      if(!key) return;
+      seen[key] = (seen[key]||0)+1;
+    });
+    Object.values(seen).forEach(n=>{ if(n>1) dup += (n-1); });
+    return dup;
+  },
+  findById(id){ return this.channels.find(c=>c.id===id); }
+};
+
+/* ---------------------------------------------------------------------
+   GitHub module (REST API v3, contents endpoint)
+--------------------------------------------------------------------- */
+const GitHub = {
+  api(path){ return 'https://api.github.com'+path; },
+  b64EncodeUnicode(str){
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (m,p)=>String.fromCharCode('0x'+p)));
+  },
+  b64DecodeUnicode(str){
+    return decodeURIComponent(atob(str).split('').map(c=>'%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+  },
+  async pull(){
+    const g = Store.github;
+    if(!g.repo || !g.path){ Toast.show('Set repository and file path first','error'); return; }
+    UI.loading(true);
+    try{
+      const url = this.api('/repos/'+g.repo+'/contents/'+encodeURIComponent(g.path).replace(/%2F/g,'/'))+'?ref='+encodeURIComponent(g.branch||'main');
+      const res = await fetch(url, { headers: g.token ? {Authorization:'token '+g.token} : {} });
+      if(!res.ok) throw new Error('GitHub responded '+res.status);
+      const data = await res.json();
+      const content = this.b64DecodeUnicode(data.content.replace(/\n/g,''));
+      const parsed = M3U.parse(content);
+      Store.snapshot();
+      Store.channels = parsed;
+      Store.touch(); UI.refreshAll();
+      Toast.show('Pulled '+parsed.length+' channels from GitHub','ok');
+      Log.add('Pulled playlist from GitHub: '+g.repo+'/'+g.path, 'ok');
+    }catch(err){
+      Toast.show('GitHub pull failed: '+err.message,'error');
+      Log.add('GitHub pull error: '+err.message,'error');
+    } finally { UI.loading(false); }
+  },
+  async push(){
+    const g = Store.github;
+    if(!g.repo || !g.path){ Toast.show('Set repository and file path first','error'); return; }
+    if(!g.token){ Toast.show('A personal access token is required to push','error'); return; }
+    UI.loading(true);
+    try{
+      const contentsUrl = this.api('/repos/'+g.repo+'/contents/'+encodeURIComponent(g.path).replace(/%2F/g,'/'));
+      let sha = null;
+      try{
+        const shaRes = await fetch(contentsUrl+'?ref='+encodeURIComponent(g.branch||'main'), { headers:{Authorization:'token '+g.token} });
+        if(shaRes.ok){ const shaData = await shaRes.json(); sha = shaData.sha; }
+      }catch(e){ /* file may not exist yet */ }
+      const body = {
+        message: document.getElementById('ghCommitMsg').value || 'Update playlist via GoM3U Studio',
+        content: this.b64EncodeUnicode(M3U.serialize(Store.channels)),
+        branch: g.branch || 'main'
+      };
+      if(sha) body.sha = sha;
+      const res = await fetch(contentsUrl, {
+        method:'PUT', headers:{Authorization:'token '+g.token, 'Content-Type':'application/json'}, body: JSON.stringify(body)
+      });
+      if(!res.ok){ const errData = await res.json().catch(()=>({})); throw new Error(errData.message || ('status '+res.status)); }
+      Toast.show('Playlist pushed to GitHub','ok');
+      Log.add('Pushed playlist to GitHub: '+g.repo+'/'+g.path, 'ok');
+    }catch(err){
+      Toast.show('GitHub push failed: '+err.message,'error');
+      Log.add('GitHub push error: '+err.message,'error');
+    } finally { UI.loading(false); }
+  },
+  debouncedAutoPush: null
+};
+
+/* ---------------------------------------------------------------------
+   UI module — rendering + view logic
+--------------------------------------------------------------------- */
+const UI = {
+  currentView: 'dashboard',
+  page: 1, pageSize: 100,
+  selected: new Set(),
+  searchTerm: '',
+  groupFilterVal: '',
+  activeChannelId: null,
+
+  loading(show){ document.getElementById('loadingOverlay').classList.toggle('show', !!show); },
+
+  init(){
+    this.bindNav();
+    this.bindTopbar();
+    this.bindImport();
+    this.bindChannels();
+    this.bindGroups();
+    this.bindLogos();
+    this.bindBulk();
+    this.bindTools();
+    this.bindExport();
+    this.bindGitHub();
+    this.bindSettings();
+    this.bindFabs();
+    this.bindModals();
+    this.bindKeyboard();
+    this.applySettingsToUi();
+    this.refreshAll();
+    this.trackOnline();
+  },
+
+  trackOnline(){
+    const dot = document.getElementById('onlineDot');
+    const set = ()=> dot.classList.toggle('off', !navigator.onLine);
+    window.addEventListener('online', set); window.addEventListener('offline', set); set();
+  },
+
+  bindNav(){
+    document.querySelectorAll('.nav-item').forEach(item=>{
+      item.addEventListener('click', ()=>{
+        document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+        item.classList.add('active');
+        this.showView(item.dataset.view);
+        if(window.innerWidth <= 920) document.getElementById('sidebar').classList.remove('open');
+      });
+    });
+  },
+  showView(name){
+    this.currentView = name;
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+name).classList.add('active');
+    if(name==='groups') this.renderGroups();
+    if(name==='logos') this.renderLogos();
+    if(name==='export') this.renderExportPreview();
+    if(name==='github') this.loadGithubFields();
+    if(name==='settings') this.loadSettingsFields();
+    if(name==='dashboard') this.renderDashboard();
+    if(name==='channels') this.renderTable();
+  },
+
+  bindTopbar(){
+    document.getElementById('sidebarToggle').addEventListener('click', ()=> document.getElementById('sidebar').classList.toggle('open'));
+    document.getElementById('themeToggle').addEventListener('click', ()=>{
+      const html = document.documentElement;
+      const next = html.getAttribute('data-theme')==='dark' ? 'light':'dark';
+      html.setAttribute('data-theme', next);
+      Store.settings.theme = next; Store.persist();
+    });
+    document.getElementById('logoutBtn').addEventListener('click', ()=> Auth.logout());
+    document.getElementById('saveBtn').addEventListener('click', ()=>{ Store.persist(); Toast.show('Project saved','ok'); });
+    document.getElementById('undoBtn').addEventListener('click', ()=> Store.undo());
+    document.getElementById('redoBtn').addEventListener('click', ()=> Store.redo());
+    const search = document.getElementById('globalSearch');
+    search.addEventListener('input', Util.debounce(()=>{
+      this.searchTerm = search.value.trim().toLowerCase();
+      this.page = 1;
+      if(this.currentView !== 'channels'){
+        document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+        document.querySelector('.nav-item[data-view="channels"]').classList.add('active');
+        this.showView('channels');
+      }
+      this.renderTable();
+    }, 220));
+  },
+
+  bindKeyboard(){
+    document.addEventListener('keydown', (e)=>{
+      const ctrl = e.ctrlKey || e.metaKey;
+      if(ctrl && e.key.toLowerCase()==='s'){ e.preventDefault(); Store.persist(); Toast.show('Project saved','ok'); }
+      else if(ctrl && e.key.toLowerCase()==='o'){ e.preventDefault(); this.showView('import'); document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active', i.dataset.view==='import')); }
+      else if(ctrl && e.key.toLowerCase()==='f'){ e.preventDefault(); document.getElementById('globalSearch').focus(); }
+      else if(ctrl && e.key.toLowerCase()==='z'){ e.preventDefault(); Store.undo(); }
+      else if(ctrl && e.key.toLowerCase()==='y'){ e.preventDefault(); Store.redo(); }
+      else if(e.key === 'Delete' && this.selected.size && document.activeElement.tagName!=='INPUT' && document.activeElement.tagName!=='TEXTAREA'){
+        this.deleteSelected();
+      }
+    });
+  },
+
+  applySettingsToUi(){
+    document.documentElement.setAttribute('data-theme', Store.settings.theme || 'dark');
+    document.documentElement.style.setProperty('--fs-base', (Store.settings.fontSize||14)+'px');
+  },
+
+  refreshAll(){
+    this.renderDashboard();
+    this.renderGroupFilterOptions();
+    this.renderTable();
+    this.renderGroups();
+    this.renderLogos();
+    this.updateStatusBar();
+    if(this.currentView==='export') this.renderExportPreview();
+  },
+
+  updateStatusBar(){
+    document.getElementById('sbChannels').textContent = Store.channels.length;
+    document.getElementById('sbGroups').textContent = Store.groups().length;
+    document.getElementById('sbSelected').textContent = this.selected.size;
+  },
+
+  /* ---------------- Dashboard ---------------- */
+  renderDashboard(){
+    document.getElementById('statChannels').textContent = Store.channels.length;
+    document.getElementById('statGroups').textContent = Store.groups().length;
+    document.getElementById('statLogos').textContent = Object.keys(Store.uniqueLogos()).length;
+    document.getElementById('statInvalid').textContent = Store.invalidCount();
+    document.getElementById('statDup').textContent = Store.duplicateCount();
+    document.getElementById('statModified').textContent = Store.lastModified ? new Date(Store.lastModified).toLocaleString() : '—';
+    const gc = Store.groupCounts();
+    const top = Object.entries(gc).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    let html = '';
+    html += '<div><div class="kv-row"><span>Total Stream Entries</span><span>'+Store.channels.length+'</span></div>';
+    html += '<div class="kv-row"><span>Channels with Logos</span><span>'+Store.channels.filter(c=>c.logo||c.tvgLogo).length+'</span></div>';
+    html += '<div class="kv-row"><span>Empty Names</span><span>'+Store.channels.filter(c=>!c.name).length+'</span></div>';
+    html += '<div class="kv-row"><span>Empty URLs</span><span>'+Store.channels.filter(c=>!c.url).length+'</span></div></div>';
+    html += '<div>'+top.map(([g,n])=>'<div class="kv-row"><span>'+Util.escapeHtml(g)+'</span><span>'+n+'</span></div>').join('') + (top.length? '' : '<div class="muted small">No groups yet — import a playlist to get started.</div>') +'</div>';
+    document.getElementById('dashStats').innerHTML = html;
+    document.querySelectorAll('[data-qa]').forEach(btn=>{
+      btn.onclick = ()=>{
+        const qa = btn.dataset.qa;
+        const map = { import:'import', add:'channels', validate:'tools', clean:'tools', export:'export', backup:null };
+        if(qa==='backup'){ Store.backup(); return; }
+        if(qa==='add'){ this.showView('channels'); document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active', i.dataset.view==='channels')); this.openChannelDrawer(null); return; }
+        if(qa==='validate'){ this.showView('tools'); document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active', i.dataset.view==='tools')); Tools.validate(); return; }
+        if(qa==='clean'){ this.showView('tools'); document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active', i.dataset.view==='tools')); Tools.clean(); return; }
+        const v = map[qa]; if(v){ this.showView(v); document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active', i.dataset.view===v)); }
+      };
+    });
+  },
+
+  /* ---------------- Import ---------------- */
+  bindImport(){
+    document.querySelectorAll('#view-import .tab').forEach(tab=>{
+      tab.addEventListener('click', ()=>{
+        document.querySelectorAll('#view-import .tab').forEach(t=>t.classList.remove('active'));
+        document.querySelectorAll('#view-import .tabpane').forEach(p=>p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
+      });
+    });
+    document.getElementById('importUrlBtn').addEventListener('click', async ()=>{
+      const url = document.getElementById('importUrlInput').value.trim();
+      if(!url){ Toast.show('Enter a URL first','warn'); return; }
+      this.loading(true);
+      try{
+        const res = await fetch(url);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const text = await res.text();
+        this.finishImport(M3U.parse(text));
+      }catch(err){
+        Toast.show('Fetch failed (likely CORS): '+err.message,'error');
+        Log.add('Import URL failed: '+err.message,'error');
+      } finally { this.loading(false); }
+    });
+    const dz = document.getElementById('dropZone');
+    dz.addEventListener('click', ()=> document.getElementById('fileInput').click());
+    dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+    dz.addEventListener('drop', e=>{
+      e.preventDefault(); dz.classList.remove('drag');
+      const file = e.dataTransfer.files[0];
+      if(file) this.readFile(file);
+    });
+    document.getElementById('fileInput').addEventListener('change', e=>{
+      const file = e.target.files[0]; if(file) this.readFile(file);
+    });
+    document.getElementById('pasteImportBtn').addEventListener('click', ()=>{
+      const text = document.getElementById('pasteArea').value;
+      if(!text.trim()){ Toast.show('Paste some M3U content first','warn'); return; }
+      this.finishImport(M3U.parse(text));
+    });
+  },
+  readFile(file){
+    const reader = new FileReader();
+    reader.onload = ()=> this.finishImport(M3U.parse(reader.result));
+    reader.readAsText(file, 'UTF-8');
+  },
+  finishImport(parsed){
+    if(!parsed.length){ Toast.show('No channels found in that source','error'); return; }
+    Store.snapshot();
+    Store.channels = Store.channels.concat(parsed);
+    Store.touch(); this.refreshAll();
+    Toast.show('Imported '+parsed.length+' channels','ok');
+    Log.add('Imported '+parsed.length+' channels.', 'ok');
+    const box = document.getElementById('importSummary');
+    box.style.display = 'block';
+    box.innerHTML = '<div class="section-title" style="font-size:14px;"><span class="msr">summarize</span> Import Summary</div>'+
+      '<div class="kv-row"><span>Channels Parsed</span><span>'+parsed.length+'</span></div>'+
+      '<div class="kv-row"><span>Groups Found</span><span>'+new Set(parsed.map(c=>c.group||'Uncategorized')).size+'</span></div>'+
+      '<div class="kv-row"><span>Total Channels Now</span><span>'+Store.channels.length+'</span></div>';
+  },
+
+  /* ---------------- Channel Table ---------------- */
+  bindChannels(){
+    document.getElementById('addChannelBtn').addEventListener('click', ()=> this.openChannelDrawer(null));
+    document.getElementById('groupFilter').addEventListener('change', e=>{ this.groupFilterVal = e.target.value; this.page=1; this.renderTable(); });
+    document.getElementById('pageSizeSelect').addEventListener('change', e=>{ this.pageSize = parseInt(e.target.value,10); this.page=1; this.renderTable(); });
+    document.getElementById('selectAllChk').addEventListener('change', e=>{
+      const rows = this.filteredChannels();
+      const pageRows = this.paginate(rows);
+      pageRows.forEach(c=> e.target.checked ? this.selected.add(c.id) : this.selected.delete(c.id));
+      this.renderTable();
+    });
+    document.getElementById('firstPageBtn').addEventListener('click', ()=>{ this.page=1; this.renderTable(); });
+    document.getElementById('prevPageBtn').addEventListener('click', ()=>{ if(this.page>1){this.page--; this.renderTable();} });
+    document.getElementById('nextPageBtn').addEventListener('click', ()=>{ this.page++; this.renderTable(); });
+    document.getElementById('lastPageBtn').addEventListener('click', ()=>{
+      const total = Math.max(1, Math.ceil(this.filteredChannels().length / this.pageSize));
+      this.page = total; this.renderTable();
+    });
+    document.getElementById('bulkEditBtn').addEventListener('click', ()=>{
+      if(!this.selected.size){ Toast.show('Select channels first','warn'); return; }
+      Modals.open('bulkEditModal');
+    });
+    document.getElementById('dupSelectedBtn').addEventListener('click', ()=> this.duplicateSelected());
+    document.getElementById('copySelectedBtn').addEventListener('click', ()=> this.copySelectedToClipboard());
+    document.getElementById('deleteSelectedBtn').addEventListener('click', ()=> this.deleteSelected());
+    document.getElementById('closeDrawerBtn').addEventListener('click', ()=> this.closeDrawer());
+    document.getElementById('drawerSaveBtn').addEventListener('click', ()=> this.saveDrawer());
+  },
+  filteredChannels(){
+    let list = Store.channels;
+    if(this.groupFilterVal) list = list.filter(c=> (c.group||Store.settings.defaultGroup) === this.groupFilterVal);
+    if(this.searchTerm){
+      const t = this.searchTerm;
+      list = list.filter(c=>
+        (c.name||'').toLowerCase().includes(t) ||
+        (c.group||'').toLowerCase().includes(t) ||
+        (c.url||'').toLowerCase().includes(t) ||
+        (c.tvgId||'').toLowerCase().includes(t)
+      );
+    }
+    return list;
+  },
+  paginate(list){
+    const start = (this.page-1)*this.pageSize;
+    return list.slice(start, start+this.pageSize);
+  },
+  renderGroupFilterOptions(){
+    const sel = document.getElementById('groupFilter');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All Groups</option>' + Store.groups().map(g=>'<option value="'+Util.escapeAttr(g)+'">'+Util.escapeHtml(g)+'</option>').join('');
+    sel.value = current;
+  },
+  renderTable(){
+    const all = this.filteredChannels();
+    const totalPages = Math.max(1, Math.ceil(all.length / this.pageSize));
+    if(this.page > totalPages) this.page = totalPages;
+    const rows = this.paginate(all);
+    const tbody = document.getElementById('channelTbody');
+    const frag = document.createDocumentFragment();
+    const defaultLogo = Store.settings.defaultLogo || '';
+    rows.forEach(c=>{
+      const tr = document.createElement('tr');
+      tr.className = this.selected.has(c.id) ? 'selected' : '';
+      const valid = Util.isValidUrl(c.url);
+      const logoSrc = c.logo || c.tvgLogo || defaultLogo || '';
+      tr.innerHTML =
+        '<td><input type="checkbox" class="rowChk" data-id="'+c.id+'" '+(this.selected.has(c.id)?'checked':'')+'></td>'+
+        '<td>'+(logoSrc ? '<img class="logo-thumb" src="'+Util.escapeAttr(logoSrc)+'" onerror="this.style.opacity=0.25">' : '<div class="logo-thumb"></div>')+'</td>'+
+        '<td>'+Util.escapeHtml(c.name||'(no name)')+'</td>'+
+        '<td>'+Util.escapeHtml(c.group||Store.settings.defaultGroup||'Uncategorized')+'</td>'+
+        '<td class="mono" title="'+Util.escapeAttr(c.url)+'" style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'+Util.escapeHtml(c.url||'')+'</td>'+
+        '<td>'+(valid?'<span class="badge badge-ok"><span class="msr" style="font-size:12px;">check</span>Valid</span>':'<span class="badge badge-bad"><span class="msr" style="font-size:12px;">close</span>Invalid</span>')+'</td>'+
+        '<td><div class="row-actions">'+
+          '<button class="icon-btn rowEdit" data-id="'+c.id+'" title="Edit"><span class="msr" style="font-size:17px;">edit</span></button>'+
+          '<button class="icon-btn rowDup" data-id="'+c.id+'" title="Duplicate"><span class="msr" style="font-size:17px;">content_copy</span></button>'+
+          '<button class="icon-btn rowDelete" data-id="'+c.id+'" title="Delete"><span class="msr" style="font-size:17px;">delete</span></button>'+
+        '</div></td>';
+      frag.appendChild(tr);
+    });
+    tbody.innerHTML = '';
+    tbody.appendChild(frag);
+    // bind row events
+    tbody.querySelectorAll('.rowChk').forEach(chk=>{
+      chk.addEventListener('change', ()=>{
+        chk.checked ? this.selected.add(chk.dataset.id) : this.selected.delete(chk.dataset.id);
+        this.updateStatusBar();
+        chk.closest('tr').classList.toggle('selected', chk.checked);
+      });
+    });
+    tbody.querySelectorAll('tr').forEach((tr,i)=>{
+      tr.addEventListener('click', (e)=>{
+        if(e.target.closest('button') || e.target.tagName==='INPUT') return;
+        this.openChannelDrawer(rows[i].id);
+      });
+    });
+    tbody.querySelectorAll('.rowEdit').forEach(b=> b.addEventListener('click', ()=> this.openChannelDrawer(b.dataset.id)));
+    tbody.querySelectorAll('.rowDup').forEach(b=> b.addEventListener('click', ()=>{ this.selected = new Set([b.dataset.id]); this.duplicateSelected(); }));
+    tbody.querySelectorAll('.rowDelete').forEach(b=> b.addEventListener('click', ()=>{ this.selected = new Set([b.dataset.id]); this.deleteSelected(); }));
+
+    document.getElementById('pageLabel').textContent = this.page+' / '+totalPages;
+    const start = all.length ? ((this.page-1)*this.pageSize+1) : 0;
+    const end = Math.min(this.page*this.pageSize, all.length);
+    document.getElementById('rangeLabel').textContent = start+'–'+end+' of '+all.length;
+    document.getElementById('firstPageBtn').disabled = this.page<=1;
+    document.getElementById('prevPageBtn').disabled = this.page<=1;
+    document.getElementById('nextPageBtn').disabled = this.page>=totalPages;
+    document.getElementById('lastPageBtn').disabled = this.page>=totalPages;
+    this.updateStatusBar();
+  },
+
+  openChannelDrawer(id){
+    this.activeChannelId = id;
+    const c = id ? Store.findById(id) : {
+      id:null, name:'', url:'', logo:'', group:'', tvgId:'', tvgName:'', tvgLogo:'',
+      tvgCountry:'', tvgLanguage:'', userAgent:'', referrer:'', catchup:'', catchupDays:'', drmKey:''
+    };
+    document.getElementById('drawerTitle').textContent = id ? 'Edit Channel' : 'Add Channel';
+    const fields = [
+      ['name','Channel Name','text'], ['url','Stream URL','text'], ['logo','Logo URL','text'],
+      ['group','Group Title','text'], ['tvgId','tvg-id','text'], ['tvgName','tvg-name','text'],
+      ['tvgLogo','tvg-logo','text'], ['tvgCountry','tvg-country','text'], ['tvgLanguage','tvg-language','text'],
+      ['userAgent','User-Agent','text'], ['referrer','Referrer','text'], ['catchup','Catchup (default/shift/append)','text'],
+      ['catchupDays','Catchup Days','text'], ['drmKey','DRM Placeholder (license key)','text']
+    ];
+    document.getElementById('drawerForm').innerHTML = fields.map(([key,label])=>
+      '<div><label>'+label+'</label><input type="text" data-field="'+key+'" value="'+Util.escapeAttr(c[key]||'')+'"></div>'
+    ).join('');
+    document.getElementById('propDrawer').classList.add('open');
+  },
+  closeDrawer(){ document.getElementById('propDrawer').classList.remove('open'); },
+  saveDrawer(){
+    const inputs = document.querySelectorAll('#drawerForm input[data-field]');
+    const data = {};
+    inputs.forEach(inp=> data[inp.dataset.field] = inp.value.trim());
+    Store.snapshot();
+    if(this.activeChannelId){
+      const c = Store.findById(this.activeChannelId);
+      Object.assign(c, data);
+      Toast.show('Channel updated','ok');
+    } else {
+      data.id = Util.uid();
+      Store.channels.push(data);
+      Toast.show('Channel added','ok');
+    }
+    Store.touch(); this.refreshAll(); this.closeDrawer();
+  },
+
+  duplicateSelected(){
+    if(!this.selected.size){ Toast.show('Select channels first','warn'); return; }
+    Store.snapshot();
+    const ids = Array.from(this.selected);
+    ids.forEach(id=>{
+      const c = Store.findById(id);
+      if(c){ const copy = Util.clone(c); copy.id = Util.uid(); copy.name = (copy.name||'')+' (copy)'; Store.channels.push(copy); }
+    });
+    Store.touch(); this.refreshAll();
+    Toast.show('Duplicated '+ids.length+' channel(s)','ok');
+  },
+  copySelectedToClipboard(){
+    if(!this.selected.size){ Toast.show('Select channels first','warn'); return; }
+    const ids = Array.from(this.selected);
+    const chans = ids.map(id=>Store.findById(id)).filter(Boolean);
+    Util.copyToClipboard(M3U.serialize(chans)).then(()=> Toast.show('Copied '+chans.length+' channel(s) as M3U','ok'));
+  },
+  deleteSelected(){
+    if(!this.selected.size){ Toast.show('Select channels first','warn'); return; }
+    const doDelete = ()=>{
+      Store.snapshot();
+      Store.channels = Store.channels.filter(c=> !this.selected.has(c.id));
+      this.selected.clear();
+      Store.touch(); this.refreshAll();
+      Toast.show('Deleted selected channel(s)','ok');
+    };
+    if(Store.settings.confirmDelete){
+      Modals.confirm('Delete Channels', 'This will permanently remove the selected channel(s). Continue?', doDelete);
+    } else doDelete();
+  },
+
+  /* ---------------- Group Manager ---------------- */
+  bindGroups(){
+    document.getElementById('sortGroupsBtn').addEventListener('click', ()=> Tools.sortGroupsAlpha());
+    document.getElementById('mergeGroupsBtn').addEventListener('click', ()=>{
+      const checks = document.querySelectorAll('.groupChk:checked');
+      if(checks.length < 2){ Toast.show('Select at least 2 groups to merge','warn'); return; }
+      const names = Array.from(checks).map(c=>c.dataset.group);
+      const target = names[0];
+      Store.snapshot();
+      Store.channels.forEach(c=>{ if(names.includes(c.group||Store.settings.defaultGroup)) c.group = target; });
+      Store.touch(); this.refreshAll();
+      Toast.show('Merged '+names.length+' groups into "'+target+'"','ok');
+    });
+    document.getElementById('deleteEmptyGroupsBtn').addEventListener('click', ()=>{
+      const counts = Store.groupCounts();
+      const empties = Object.keys(Store.groupMeta).filter(g=> !counts[g]);
+      empties.forEach(g=> delete Store.groupMeta[g]);
+      Store.persist();
+      Toast.show(empties.length ? ('Removed '+empties.length+' empty group record(s)') : 'No empty groups found', empties.length?'ok':'info');
+      this.renderGroups();
+    });
+    document.getElementById('collapseAllBtn').addEventListener('click', ()=>{
+      const groups = Store.groups();
+      const anyExpanded = groups.some(g=> !(Store.groupMeta[g]||{}).collapsed);
+      groups.forEach(g=>{ Store.groupMeta[g] = Store.groupMeta[g]||{}; Store.groupMeta[g].collapsed = anyExpanded; });
+      Store.persist(); this.renderGroups();
+    });
+  },
+  renderGroups(){
+    const counts = Store.groupCounts();
+    const groups = Store.groups();
+    const list = document.getElementById('groupList');
+    if(!groups.length){ list.innerHTML = '<p class="muted small">No groups yet. Import a playlist to see groups here.</p>'; return; }
+    list.innerHTML = groups.map(g=>{
+      const collapsed = (Store.groupMeta[g]||{}).collapsed;
+      return '<div class="group-row">'+
+        '<input type="checkbox" class="groupChk" data-group="'+Util.escapeAttr(g)+'">'+
+        '<span class="msr" style="cursor:pointer;" data-toggle="'+Util.escapeAttr(g)+'">'+(collapsed?'chevron_right':'expand_more')+'</span>'+
+        '<input type="text" class="gname-input" data-group="'+Util.escapeAttr(g)+'" value="'+Util.escapeAttr(g)+'" style="flex:1; background:transparent; border:none;">'+
+        '<span class="gcount">'+(counts[g]||0)+' channels</span>'+
+        '<button class="icon-btn renameGroupBtn" data-group="'+Util.escapeAttr(g)+'" title="Rename"><span class="msr">check</span></button>'+
+      '</div>';
+    }).join('');
+    list.querySelectorAll('.renameGroupBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const old = btn.dataset.group;
+        const input = list.querySelector('.gname-input[data-group="'+CSS.escape(old)+'"]');
+        const val = input.value.trim();
+        if(!val || val===old) return;
+        Store.snapshot();
+        Store.channels.forEach(c=>{ if((c.group||Store.settings.defaultGroup)===old) c.group = val; });
+        Store.touch(); this.refreshAll();
+        Toast.show('Group renamed to "'+val+'"','ok');
+      });
+    });
+    list.querySelectorAll('[data-toggle]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const g = el.dataset.toggle;
+        Store.groupMeta[g] = Store.groupMeta[g]||{};
+        Store.groupMeta[g].collapsed = !Store.groupMeta[g].collapsed;
+        Store.persist(); this.renderGroups();
+      });
+    });
+  },
+
+  /* ---------------- Logo Manager ---------------- */
+  bindLogos(){
+    document.getElementById('detectBrokenBtn').addEventListener('click', ()=> Logos.detectBroken());
+    document.getElementById('applyDefaultLogoBtn').addEventListener('click', ()=> Logos.applyDefaultToBroken());
+    document.getElementById('bulkLogoReplaceBtn').addEventListener('click', ()=>{
+      const find = document.getElementById('bulkLogoFind').value;
+      const rep = document.getElementById('bulkLogoReplace').value;
+      if(!find){ Toast.show('Enter text to find in logo URLs','warn'); return; }
+      Store.snapshot();
+      let count=0;
+      Store.channels.forEach(c=>{
+        const l = c.logo || c.tvgLogo || '';
+        if(l.includes(find)){ const nl = l.split(find).join(rep); c.logo = nl; c.tvgLogo = nl; count++; }
+      });
+      Store.touch(); this.refreshAll();
+      Toast.show('Replaced logo URL in '+count+' channel(s)','ok');
+    });
+  },
+  renderLogos(){
+    const logos = Store.uniqueLogos();
+    const grid = document.getElementById('logoGrid');
+    const entries = Object.entries(logos);
+    if(!entries.length){ grid.innerHTML = '<p class="muted small">No logos found yet.</p>'; return; }
+    grid.innerHTML = entries.map(([url,count],i)=>
+      '<div class="logo-card">'+
+        '<img src="'+Util.escapeAttr(url)+'" onerror="this.src=\'\'; this.style.opacity=0.2;">'+
+        '<div class="cnt">'+count+' channel(s)</div>'+
+        '<input type="text" class="logoUrlInput" data-old="'+Util.escapeAttr(url)+'" value="'+Util.escapeAttr(url)+'">'+
+        '<button class="btn btn-block replaceLogoBtn" data-old="'+Util.escapeAttr(url)+'" style="font-size:11px; padding:6px;">Replace</button>'+
+      '</div>'
+    ).join('');
+    grid.querySelectorAll('.replaceLogoBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const old = btn.dataset.old;
+        const input = grid.querySelector('.logoUrlInput[data-old="'+CSS.escape(old)+'"]');
+        const val = input.value.trim();
+        if(!val || val===old) return;
+        Store.snapshot();
+        Store.channels.forEach(c=>{
+          if((c.logo||'')===old) c.logo = val;
+          if((c.tvgLogo||'')===old) c.tvgLogo = val;
+        });
+        Store.touch(); this.refreshAll();
+        Toast.show('Logo replaced across matching channels','ok');
+      });
+    });
+  },
+
+  /* ---------------- Bulk Tools ---------------- */
+  bindBulk(){
+    document.getElementById('frBtn').addEventListener('click', ()=>{
+      const field = document.getElementById('frField').value;
+      const find = document.getElementById('frFind').value;
+      const rep = document.getElementById('frReplace').value;
+      if(!find){ Toast.show('Enter text to find','warn'); return; }
+      Store.snapshot();
+      let count = 0;
+      const applyTo = (c,key)=>{ if((c[key]||'').includes(find)){ c[key] = c[key].split(find).join(rep); return true;} return false; };
+      Store.channels.forEach(c=>{
+        let hit=false;
+        if(field==='all'){ ['name','url','group','logo','tvgId','tvgName','tvgLogo'].forEach(k=>{ if(applyTo(c,k)) hit=true; }); }
+        else hit = applyTo(c, field);
+        if(hit) count++;
+      });
+      Store.touch(); this.refreshAll();
+      Toast.show('Find & Replace applied to '+count+' channel(s)','ok');
+      Log.add('Find & Replace: "'+find+'" -> "'+rep+'" on '+count+' channels', 'ok');
+    });
+    document.getElementById('domBtn').addEventListener('click', ()=>{
+      const oldD = document.getElementById('domOld').value.trim();
+      const newD = document.getElementById('domNew').value.trim();
+      if(!oldD || !newD){ Toast.show('Enter both old and new domain','warn'); return; }
+      Store.snapshot();
+      let count=0;
+      Store.channels.forEach(c=>{ if(c.url && c.url.includes(oldD)){ c.url = c.url.split(oldD).join(newD); count++; } });
+      Store.touch(); this.refreshAll();
+      Toast.show('Replaced domain in '+count+' stream URL(s)','ok');
+    });
+    document.getElementById('prefixSuffixBtn').addEventListener('click', ()=>{
+      const pre = document.getElementById('prefixInput').value;
+      const suf = document.getElementById('suffixInput').value;
+      if(!pre && !suf){ Toast.show('Enter a prefix or suffix','warn'); return; }
+      Store.snapshot();
+      Store.channels.forEach(c=>{ c.name = (pre||'')+(c.name||'')+(suf||''); });
+      Store.touch(); this.refreshAll();
+      Toast.show('Prefix/Suffix applied to all channels','ok');
+    });
+    document.getElementById('removeDupBtn').addEventListener('click', ()=> Tools.removeDuplicates());
+    document.getElementById('removeEmptyBtn').addEventListener('click', ()=> Tools.removeEmpty());
+    document.getElementById('removeInvalidBtn').addEventListener('click', ()=> Tools.removeInvalid());
+    document.getElementById('sortChannelsBtn').addEventListener('click', ()=> Tools.sortChannelsAlpha());
+    document.getElementById('sortGroupsBtn2').addEventListener('click', ()=> Tools.sortGroupsAlpha());
+  },
+
+  /* ---------------- Playlist Tools ---------------- */
+  bindTools(){
+    document.getElementById('validateBtn').addEventListener('click', ()=> Tools.validate());
+    document.getElementById('fixFormatBtn').addEventListener('click', ()=> Tools.fixFormatting());
+    document.getElementById('cleanPlaylistBtn').addEventListener('click', ()=> Tools.clean());
+    document.getElementById('detectErrorsBtn').addEventListener('click', ()=> Tools.detectErrors());
+  },
+
+  /* ---------------- Export ---------------- */
+  bindExport(){
+    document.querySelectorAll('#view-export .tab').forEach(tab=>{
+      tab.addEventListener('click', ()=>{
+        document.querySelectorAll('#view-export .tab').forEach(t=>t.classList.remove('active'));
+        tab.classList.add('active');
+        this.renderExportPreview();
+      });
+    });
+    document.getElementById('downloadExportBtn').addEventListener('click', ()=>{
+      const fmt = document.querySelector('#view-export .tab.active').dataset.etab;
+      const content = document.getElementById('exportPreview').value;
+      const names = { m3u:'playlist.m3u', txt:'playlist.txt', json:'playlist.json' };
+      const mimes = { m3u:'audio/x-mpegurl', txt:'text/plain', json:'application/json' };
+      Util.download(names[fmt], content, mimes[fmt]);
+      Toast.show('Export downloaded','ok');
+    });
+    document.getElementById('copyExportBtn').addEventListener('click', ()=>{
+      Util.copyToClipboard(document.getElementById('exportPreview').value).then(()=> Toast.show('Copied to clipboard','ok'));
+    });
+    document.getElementById('saveExportBtn').addEventListener('click', ()=>{ Store.backup(); Toast.show('Snapshot saved to backup slot','ok'); });
+  },
+  renderExportPreview(){
+    const fmt = document.querySelector('#view-export .tab.active') ? document.querySelector('#view-export .tab.active').dataset.etab : 'm3u';
+    let content = '';
+    if(fmt==='m3u') content = M3U.serialize(Store.channels);
+    else if(fmt==='txt') content = M3U.toTxt(Store.channels);
+    else content = M3U.toJson(Store.channels);
+    document.getElementById('exportPreview').value = content;
+  },
+
+  /* ---------------- GitHub ---------------- */
+  bindGitHub(){
+    document.getElementById('ghPushBtn').addEventListener('click', ()=> GitHub.push());
+    document.getElementById('ghPullBtn').addEventListener('click', ()=> GitHub.pull());
+    document.getElementById('ghSaveSettingsBtn').addEventListener('click', ()=> this.saveGithubFields());
+    document.getElementById('ghAutoSave').addEventListener('change', (e)=>{ Store.github.autoSave = e.target.checked; this.saveGithubFields(); });
+  },
+  loadGithubFields(){
+    const g = Store.github;
+    document.getElementById('ghRepo').value = g.repo||'';
+    document.getElementById('ghBranch').value = g.branch||'main';
+    document.getElementById('ghPath').value = g.path||'playlist.m3u';
+    document.getElementById('ghToken').value = g.token||'';
+    document.getElementById('ghAutoSave').checked = !!g.autoSave;
+  },
+  saveGithubFields(){
+    Store.github.repo = document.getElementById('ghRepo').value.trim();
+    Store.github.branch = document.getElementById('ghBranch').value.trim() || 'main';
+    Store.github.path = document.getElementById('ghPath').value.trim() || 'playlist.m3u';
+    Store.github.token = document.getElementById('ghToken').value.trim();
+    Store.persist();
+    Toast.show('GitHub settings saved','ok');
+  },
+
+  /* ---------------- Settings ---------------- */
+  bindSettings(){
+    document.getElementById('saveSettingsBtn').addEventListener('click', ()=> this.saveSettingsFields());
+    document.getElementById('backupNowBtn').addEventListener('click', ()=> Store.backup());
+    document.getElementById('restoreBackupBtn').addEventListener('click', ()=>{
+      Modals.confirm('Restore Backup', 'This will replace your current playlist with the last saved backup. Continue?', ()=> Store.restoreBackup());
+    });
+    document.getElementById('resetProjectBtn').addEventListener('click', ()=>{
+      Modals.confirm('Reset Project', 'This will permanently delete all channels and settings data. This cannot be undone. Continue?', ()=> Store.resetProject());
+    });
+    document.getElementById('settingTheme').addEventListener('change', e=>{
+      document.documentElement.setAttribute('data-theme', e.target.value);
+    });
+    document.getElementById('settingFontSize').addEventListener('input', e=>{
+      document.documentElement.style.setProperty('--fs-base', e.target.value+'px');
+    });
+  },
+  loadSettingsFields(){
+    const s = Store.settings;
+    document.getElementById('settingTheme').value = s.theme||'dark';
+    document.getElementById('settingFontSize').value = s.fontSize||14;
+    document.getElementById('settingDefaultLogo').value = s.defaultLogo||'';
+    document.getElementById('settingDefaultGroup').value = s.defaultGroup||'Uncategorized';
+    document.getElementById('settingAutoSave').checked = s.autoSave!==false;
+    document.getElementById('settingConfirmDelete').checked = s.confirmDelete!==false;
+  },
+  saveSettingsFields(){
+    Store.settings.theme = document.getElementById('settingTheme').value;
+    Store.settings.fontSize = parseInt(document.getElementById('settingFontSize').value,10);
+    Store.settings.defaultLogo = document.getElementById('settingDefaultLogo').value.trim();
+    Store.settings.defaultGroup = document.getElementById('settingDefaultGroup').value.trim() || 'Uncategorized';
+    Store.settings.autoSave = document.getElementById('settingAutoSave').checked;
+    Store.settings.confirmDelete = document.getElementById('settingConfirmDelete').checked;
+    Store.persist(); this.applySettingsToUi(); this.refreshAll();
+    Toast.show('Settings saved','ok');
+  },
+
+  /* ---------------- FABs & Modals ---------------- */
+  bindFabs(){
+    document.querySelectorAll('.fab').forEach(fab=>{
+      fab.addEventListener('click', ()=>{
+        const map = { add:'channels', import:'import', export:'export', settings:'settings' };
+        const target = fab.dataset.fab;
+        if(target==='save'){ Store.persist(); Toast.show('Project saved','ok'); return; }
+        const view = map[target];
+        this.showView(view);
+        document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active', i.dataset.view===view));
+        if(target==='add') this.openChannelDrawer(null);
+      });
+    });
+  },
+  bindModals(){
+    document.querySelectorAll('.modal-close').forEach(b=> b.addEventListener('click', ()=> Modals.closeAll()));
+    document.querySelectorAll('.modal-overlay').forEach(ov=> ov.addEventListener('click', e=>{ if(e.target===ov) Modals.closeAll(); }));
+    document.getElementById('bulkEditApplyBtn').addEventListener('click', ()=>{
+      const fields = { group:'bulkGroup', tvgCountry:'bulkCountry', tvgLanguage:'bulkLanguage', userAgent:'bulkUA', referrer:'bulkReferrer', catchup:'bulkCatchup' };
+      const values = {};
+      Object.entries(fields).forEach(([key,id])=>{ const v = document.getElementById(id).value.trim(); if(v) values[key]=v; });
+      if(!Object.keys(values).length){ Toast.show('Enter at least one field to apply','warn'); return; }
+      Store.snapshot();
+      let count=0;
+      this.selected.forEach(id=>{
+        const c = Store.findById(id);
+        if(c){ Object.assign(c, values); count++; }
+      });
+      Store.touch(); this.refreshAll();
+      Modals.closeAll();
+      Toast.show('Bulk edit applied to '+count+' channel(s)','ok');
+      Object.values(fields).forEach(id=> document.getElementById(id).value='');
+    });
+  }
+};
+
+/* ---------------------------------------------------------------------
+   Modals helper module
+--------------------------------------------------------------------- */
+const Modals = {
+  open(id){ document.getElementById(id).classList.add('open'); },
+  closeAll(){ document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); },
+  confirm(title, msg, onConfirm){
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').textContent = msg;
+    this.open('confirmModal');
+    const btn = document.getElementById('confirmOkBtn');
+    const handler = ()=>{ onConfirm(); this.closeAll(); btn.removeEventListener('click', handler); };
+    btn.replaceWith(btn.cloneNode(true));
+    document.getElementById('confirmOkBtn').addEventListener('click', handler);
+  }
+};
+
+/* ---------------------------------------------------------------------
+   Logo validation module
+--------------------------------------------------------------------- */
+const Logos = {
+  detectBroken(){
+    const logos = Store.uniqueLogos();
+    const urls = Object.keys(logos);
+    if(!urls.length){ Toast.show('No logos to check','warn'); return; }
+    UI.loading(true);
+    let done = 0, broken = 0;
+    urls.forEach(url=>{
+      const img = new Image();
+      const finish = (ok)=>{
+        done++;
+        if(!ok){ broken++; Log.add('Broken logo detected: '+url, 'warn'); }
+        if(done === urls.length){
+          UI.loading(false);
+          Toast.show('Checked '+urls.length+' logos — '+broken+' broken', broken?'warn':'ok');
+        }
+      };
+      img.onload = ()=>finish(true);
+      img.onerror = ()=>finish(false);
+      img.src = url;
+      setTimeout(()=>{ if(!img.complete) finish(false); }, 6000);
+    });
+  },
+  applyDefaultToBroken(){
+    const def = Store.settings.defaultLogo;
+    if(!def){ Toast.show('Set a Default Logo URL in Settings first','warn'); return; }
+    Store.snapshot();
+    let count=0;
+    Store.channels.forEach(c=>{
+      const l = c.logo || c.tvgLogo;
+      if(!l){ c.logo = def; c.tvgLogo = def; count++; }
+    });
+    Store.touch(); UI.refreshAll();
+    Toast.show('Applied default logo to '+count+' channel(s) missing one','ok');
+  }
+};
+
+/* ---------------------------------------------------------------------
+   Playlist Tools module (validate / fix / clean / detect / sort / dedupe)
+--------------------------------------------------------------------- */
+const Tools = {
+  removeDuplicates(){
+    Store.snapshot();
+    const seen = new Set(); const out = [];
+    Store.channels.forEach(c=>{
+      const key = (c.url||'').trim().toLowerCase();
+      if(key && seen.has(key)) return;
+      if(key) seen.add(key);
+      out.push(c);
+    });
+    const removed = Store.channels.length - out.length;
+    Store.channels = out;
+    Store.touch(); UI.refreshAll();
+    Toast.show('Removed '+removed+' duplicate channel(s)','ok');
+    Log.add('Removed '+removed+' duplicates.', 'ok');
+  },
+  removeEmpty(){
+    Store.snapshot();
+    const before = Store.channels.length;
+    Store.channels = Store.channels.filter(c=> (c.name && c.name.trim()) && (c.url && c.url.trim()));
+    const removed = before - Store.channels.length;
+    Store.touch(); UI.refreshAll();
+    Toast.show('Removed '+removed+' empty channel(s)','ok');
+  },
+  removeInvalid(){
+    Store.snapshot();
+    const before = Store.channels.length;
+    Store.channels = Store.channels.filter(c=> Util.isValidUrl(c.url));
+    const removed = before - Store.channels.length;
+    Store.touch(); UI.refreshAll();
+    Toast.show('Removed '+removed+' invalid stream URL(s)','ok');
+  },
+  sortChannelsAlpha(){
+    Store.snapshot();
+    Store.channels.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+    Store.touch(); UI.refreshAll();
+    Toast.show('Channels sorted A–Z','ok');
+  },
+  sortGroupsAlpha(){
+    Store.snapshot();
+    Store.channels.sort((a,b)=> (a.group||'').localeCompare(b.group||'') || (a.name||'').localeCompare(b.name||''));
+    Store.touch(); UI.refreshAll();
+    Toast.show('Groups sorted A–Z','ok');
+  },
+  validate(){
+    const total = Store.channels.length;
+    const invalid = Store.invalidCount();
+    const dup = Store.duplicateCount();
+    const noName = Store.channels.filter(c=>!c.name||!c.name.trim()).length;
+    const noLogo = Store.channels.filter(c=>!(c.logo||c.tvgLogo)).length;
+    const report = [
+      'Validation Report — '+Util.nowStr(),
+      'Total channels: '+total,
+      'Invalid stream URLs: '+invalid,
+      'Duplicate stream URLs: '+dup,
+      'Channels missing a name: '+noName,
+      'Channels missing a logo: '+noLogo,
+      'Groups: '+Store.groups().length
+    ].join('\n');
+    document.getElementById('toolsReport').textContent = report;
+    Toast.show('Validation complete','ok');
+    Log.add('Validation run — '+invalid+' invalid, '+dup+' duplicates.', invalid||dup?'warn':'ok');
+  },
+  fixFormatting(){
+    Store.snapshot();
+    let fixed = 0;
+    Store.channels.forEach(c=>{
+      const before = JSON.stringify(c);
+      c.name = (c.name||'').trim();
+      c.url = (c.url||'').trim();
+      c.group = (c.group||'').trim() || Store.settings.defaultGroup || 'Uncategorized';
+      c.logo = (c.logo||c.tvgLogo||'').trim();
+      c.tvgLogo = c.logo;
+      c.tvgName = (c.tvgName||c.name||'').trim();
+      if(JSON.stringify(c) !== before) fixed++;
+    });
+    Store.touch(); UI.refreshAll();
+    Toast.show('Fixed formatting on '+fixed+' channel(s)','ok');
+  },
+  clean(){
+    Store.snapshot();
+    const before = Store.channels.length;
+    this.fixFormatting();
+    this.removeEmpty();
+    this.removeInvalid();
+    this.removeDuplicates();
+    Toast.show('Playlist cleaned ('+(before-Store.channels.length)+' entries removed)','ok');
+  },
+  detectErrors(){
+    let errors = [];
+    Store.channels.forEach((c,i)=>{
+      if(!c.name||!c.name.trim()) errors.push('Row '+(i+1)+': missing channel name');
+      if(!Util.isValidUrl(c.url)) errors.push('Row '+(i+1)+' ('+(c.name||'unnamed')+'): invalid or missing stream URL');
+    });
+    document.getElementById('toolsReport').textContent = errors.length ? errors.slice(0,200).join('\n') + (errors.length>200?'\n… and '+(errors.length-200)+' more':'') : 'No errors detected.';
+    errors.slice(0,50).forEach(e=> Log.add(e,'warn'));
+    Toast.show(errors.length ? ('Found '+errors.length+' issue(s)') : 'No issues found', errors.length?'warn':'ok');
+  }
+};
+
+/* ---------------------------------------------------------------------
+   App bootstrap
+--------------------------------------------------------------------- */
+const App = {
+  boot(){
+    Toast.init();
+    Log.init();
+    Store.init();
+    UI.init();
+    Log.add('GoM3U Studio v'+APP_VERSION+' initialized.', 'ok');
+    Toast.show('Welcome to GoM3U Studio','ok');
+    // periodic autosave every 30s if enabled
+    setInterval(()=>{ if(Store.settings.autoSave) Store.persist(); }, 30000);
+  }
+};
+
+document.addEventListener('DOMContentLoaded', ()=> Auth.init());
+
+})();
+</script>
+</body>
+</html>
